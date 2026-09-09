@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Badge Studio & QR Generator — EventPass</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<style>
+  :root {
+    --bg-dark: #090d16;
+    --bg-surface: #0f172a;
+    --bg-card: #131d33;
+    --border-color: rgba(255, 255, 255, 0.08);
+    --primary: #10b981;
+    --primary-hover: #059669;
+    --accent: #06b6d4;
+    --warning: #f59e0b;
+    --text-main: #f8fafc;
+    --text-muted: #94a3b8;
+    --radius-md: 12px;
+    --radius-lg: 16px;
+    --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.4);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    background: var(--bg-dark);
+    color: var(--text-main);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    line-height: 1.5;
+  }
+  .header-nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 24px;
+    background: rgba(9, 13, 22, 0.85);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border-color);
+  }
+  .brand {
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-weight: 700;
+    color: #fff;
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 1.1rem;
+  }
+  .nav-links {
+    display: flex;
+    gap: 12px;
+  }
+  .nav-links a {
+    color: var(--text-muted);
+    text-decoration: none;
+    font-size: 0.85rem;
+    font-weight: 600;
+    padding: 6px 12px;
+    border-radius: 8px;
+    background: rgba(255,255,255,0.04);
+    transition: all 0.15s;
+  }
+  .nav-links a:hover {
+    color: #fff;
+    background: rgba(255,255,255,0.08);
+  }
+  .wrap {
+    max-width: 1100px;
+    width: 100%;
+    margin: 0 auto;
+    padding: 24px 20px 80px;
+  }
+  .page-title {
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-size: 1.6rem;
+    margin-bottom: 4px;
+  }
+  .page-sub {
+    color: var(--text-muted);
+    margin-bottom: 24px;
+    font-size: 0.92rem;
+  }
+  .panel {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    padding: 22px;
+    margin-bottom: 24px;
+  }
+  label {
+    display: block;
+    font-size: 0.82rem;
+    font-weight: 600;
+    margin-bottom: 6px;
+    color: var(--text-muted);
+  }
+  textarea {
+    width: 100%;
+    min-height: 130px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.85rem;
+    padding: 12px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    color: #fff;
+    resize: vertical;
+  }
+  textarea:focus, select:focus, input[type=text]:focus {
+    outline: none;
+    border-color: var(--primary);
+  }
+  .hint {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-top: 6px;
+  }
+  .row-inline {
+    display: flex;
+    gap: 12px;
+    margin-top: 14px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  select, input[type=text] {
+    padding: 9px 12px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    color: #fff;
+    font-size: 0.9rem;
+  }
+  button {
+    background: var(--primary);
+    color: #052e16;
+    border: none;
+    padding: 10px 18px;
+    border-radius: var(--radius-md);
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  button:hover { background: var(--primary-hover); color: #fff; }
+  button.secondary {
+    background: rgba(255,255,255,0.05);
+    color: var(--text-main);
+    border: 1px solid var(--border-color);
+  }
+  button.secondary:hover { background: rgba(255,255,255,0.1); }
+  button.accent {
+    background: var(--accent);
+    color: #042f2e;
+  }
+  button.accent:hover { background: #0891b2; color: #fff; }
+  .actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin: 18px 0 24px;
+  }
+  #count-summary {
+    font-size: 0.95rem;
+    color: #fff;
+    font-weight: 600;
+    margin-bottom: 14px;
+  }
+  .cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 18px;
+  }
+  .card {
+    border-radius: var(--radius-lg);
+    padding: 18px;
+    text-align: center;
+    background: white;
+    color: #0f172a;
+    box-shadow: var(--shadow-md);
+    page-break-inside: avoid;
+    border-top: 6px solid var(--primary);
+  }
+  .card.theme-dark {
+    background: #0f172a;
+    color: #f8fafc;
+    border: 1px solid var(--border-color);
+    border-top: 6px solid var(--primary);
+  }
+  .card.theme-emerald { border-top: 6px solid #10b981; }
+  .card.theme-indigo { border-top: 6px solid #6366f1; }
+  .card-lanyard-hole {
+    width: 32px;
+    height: 7px;
+    border-radius: 999px;
+    background: #cbd5e1;
+    margin: 0 auto 10px;
+  }
+  .card.theme-dark .card-lanyard-hole { background: #334155; }
+  .card-event {
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #64748b;
+    margin-bottom: 6px;
+  }
+  .card .qr {
+    background: #ffffff;
+    padding: 8px;
+    border-radius: 8px;
+    display: inline-block;
+    margin-bottom: 10px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+  }
+  .card .name {
+    font-weight: 800;
+    font-size: 1.1rem;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    margin-bottom: 2px;
+  }
+  .card .team {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--accent);
+    margin-bottom: 6px;
+  }
+  .card .id {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.72rem;
+    color: #94a3b8;
+    letter-spacing: 0.05em;
+  }
+
+  @media print {
+    body { padding: 0; background: white !important; color: black !important; }
+    .header-nav, .panel, .actions, .page-title, .page-sub, #count-summary { display: none !important; }
+    .cards { grid-template-columns: repeat(3, 1fr) !important; gap: 12px !important; }
+    .card { break-inside: avoid !important; page-break-inside: avoid !important; box-shadow: none !important; border: 1px dashed #94a3b8 !important; }
+  }
+</style>
+</head>
+<body>
+
+<header class="header-nav">
+  <a href="index.html" class="brand">
+    <span>🎫</span> EventPass Badge Studio
+  </a>
+  <div class="nav-links">
+    <a href="index.html#dashboard">📊 Dashboard</a>
+    <a href="gate-scanner.html">📷 Gate Scanner</a>
+  </div>
+</header>
+
+<div class="wrap">
+  <h1 class="page-title">Event QR Code & Badge Generator</h1>
+  <p class="page-sub">Generate scannable attendee passes, print lanyard badges, or push directly into Google Sheets.</p>
+
+  <div class="panel">
+    <div style="display:flex; gap:12px; flex-wrap:wrap; margin-bottom:16px;">
+      <div style="flex:1; min-width:200px;">
+        <label for="event-title">Event Name</label>
+        <input type="text" id="event-title" value="TechSummit 2026" style="width:100%;" oninput="updateCards()">
+      </div>
+      <div style="min-width:160px;">
+        <label for="badge-theme">Badge Style</label>
+        <select id="badge-theme" onchange="updateTheme()" style="width:100%;">
+          <option value="theme-white">Clean White (Print-Ready)</option>
+          <option value="theme-dark">Cyber Dark</option>
+          <option value="theme-emerald">Emerald Pro</option>
+          <option value="theme-indigo">Royal Indigo</option>
+        </select>
+      </div>
+      <div style="min-width:160px;">
+        <label for="input-mode">Pass Type</label>
+        <select id="input-mode" style="width:100%;">
+          <option value="individual">Individual Attendee</option>
+          <option value="team">Team Pass (1 per Team)</option>
+        </select>
+      </div>
+    </div>
+
+    <div>
+      <label for="csv-input">Paste Attendee List (CSV or plain text)</label>
+      <textarea id="csv-input" placeholder="Name,Team&#10;Alex Chen,Falcons&#10;Priya Nair,Falcons&#10;Sam Diaz,Ravens&#10;Jo Lin,Ravens&#10;Maria Gomez,Engineering"></textarea>
+      <p class="hint" id="format-hint">Format: <code>Name,Team</code> — one attendee per line. Team is optional.</p>
+    </div>
+
+    <div class="row-inline">
+      <button onclick="generate()">⚡ Generate QR Badges</button>
+      <button class="secondary" onclick="loadSample()">📄 Load Sample Data</button>
+      <button class="accent" id="btn-push-sheet" onclick="pushToGoogleSheet()">☁️ Push to Google Sheet</button>
+    </div>
+  </div>
+
+  <div class="actions" id="export-actions" style="display:none;">
+    <button class="secondary" onclick="window.print()">🖨️ Print Badges / Save PDF</button>
+    <button class="secondary" onclick="downloadCSV()">📥 Download Sheet CSV</button>
+  </div>
+
+  <div id="count-summary"></div>
+  <div class="cards" id="cards"></div>
+</div>
+
+<script>
+let records = [];
+let scriptUrl = localStorage.getItem('eventCheckin_scriptUrl') || '';
+let passcode = localStorage.getItem('eventCheckin_passcode') || '';
+
+function loadSample() {
+  document.getElementById('csv-input').value =
+`Name,Team
+Alex Chen,Falcons
+Priya Nair,Falcons
+Sam Diaz,Ravens
+Jo Lin,Ravens
+Maria Gomez,Engineering
+Jordan Miller,Design`;
+}
+
+document.getElementById('input-mode').addEventListener('change', (e) => {
+  const hint = document.getElementById('format-hint');
+  if (e.target.value === 'team') {
+    hint.innerHTML = 'Format: <code>TeamName</code> — one row per team.';
+    document.getElementById('csv-input').placeholder = 'TeamName\nFalcons\nRavens\nEagles';
+  } else {
+    hint.innerHTML = 'Format: <code>Name,Team</code> — one attendee per line. Team is optional.';
+    document.getElementById('csv-input').placeholder = 'Name,Team\nAlex Chen,Falcons\nPriya Nair,Falcons\nSam Diaz,Ravens';
+  }
+});
+
+function makeId(prefix) {
+  const chars = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+  let s = '';
+  for (let i = 0; i < 6; i++) s += chars[Math.floor(Math.random() * chars.length)];
+  return `${prefix}-${s}`;
+}
+
+function generate() {
+  const raw = document.getElementById('csv-input').value.trim();
+  const mode = document.getElementById('input-mode').value;
+
+  if (!raw) {
+    alert('Please enter or paste attendee names.');
+    return;
+  }
+
+  const lines = raw.split('\n').map(l => l.trim()).filter(Boolean);
+  let dataLines = lines;
+  if (/^name/i.test(lines[0]) || /^team/i.test(lines[0])) {
+    dataLines = lines.slice(1);
+  }
+
+  records = [];
+  const seenIds = new Set();
+
+  dataLines.forEach((line) => {
+    const parts = line.split(',').map(p => p.trim());
+    let id;
+    do { id = makeId(mode === 'team' ? 'TEAM' : 'ATT'); } while (seenIds.has(id));
+    seenIds.add(id);
+
+    if (mode === 'team') {
+      records.push({ id, name: parts[0], team: parts[0] });
+    } else {
+      records.push({ id, name: parts[0] || '(unnamed)', team: parts[1] || 'General' });
+    }
+  });
+
+  renderCards();
+  document.getElementById('export-actions').style.display = 'flex';
+  document.getElementById('count-summary').textContent =
+    `${records.length} QR badge${records.length !== 1 ? 's' : ''} generated:`;
+}
+
+function renderCards() {
+  const container = document.getElementById('cards');
+  container.innerHTML = '';
+  const eventName = document.getElementById('event-title').value.trim() || 'EventPass';
+  const theme = document.getElementById('badge-theme').value;
+
+  records.forEach((r) => {
+    const card = document.createElement('div');
+    card.className = `card ${theme}`;
+
+    const hole = document.createElement('div');
+    hole.className = 'card-lanyard-hole';
+    card.appendChild(hole);
+
+    const ev = document.createElement('div');
+    ev.className = 'card-event';
+    ev.textContent = eventName;
+    card.appendChild(ev);
+
+    const qrDiv = document.createElement('div');
+    qrDiv.className = 'qr';
+    card.appendChild(qrDiv);
+
+    const nameEl = document.createElement('div');
+    nameEl.className = 'name';
+    nameEl.textContent = r.name;
+    card.appendChild(nameEl);
+
+    if (r.team) {
+      const teamEl = document.createElement('div');
+      teamEl.className = 'team';
+      teamEl.textContent = r.team;
+      card.appendChild(teamEl);
+    }
+
+    const idEl = document.createElement('div');
+    idEl.className = 'id';
+    idEl.textContent = r.id;
+    card.appendChild(idEl);
+
+    container.appendChild(card);
+
+    new QRCode(qrDiv, {
+      text: r.id,
+      width: 130,
+      height: 130,
+      colorDark: '#0f172a',
+      colorLight: '#ffffff',
+      correctLevel: QRCode.CorrectLevel.M
+    });
+  });
+}
+
+function updateCards() {
+  const val = document.getElementById('event-title').value.trim() || 'EventPass';
+  document.querySelectorAll('.card-event').forEach(el => el.textContent = val);
+}
+
+function updateTheme() {
+  const theme = document.getElementById('badge-theme').value;
+  document.querySelectorAll('.card').forEach(el => {
+    el.className = `card ${theme}`;
+  });
+}
+
+function pushToGoogleSheet() {
+  if (records.length === 0) {
+    alert('Please generate some badges first.');
+    return;
+  }
+  if (!scriptUrl) {
+    alert('No Google Apps Script URL found. Please set your URL in the main app Settings (index.html#settings).');
+    return;
+  }
+
+  const btn = document.getElementById('btn-push-sheet');
+  btn.disabled = true;
+  btn.textContent = 'Pushing to Sheet...';
+
+  fetch(scriptUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify({
+      action: 'batchAdd',
+      attendees: records,
+      passcode: passcode
+    })
+  })
+  .then(res => res.json())
+  .then(data => {
+    if (data.status === 'success') {
+      alert(`Success! Added ${data.added} attendees directly into your Google Sheet (${data.skipped} already existed).`);
+    } else {
+      alert('Error updating Google Sheet: ' + (data.message || 'Unknown error'));
+    }
+  })
+  .catch(err => {
+    alert('Failed to connect to Google Apps Script: ' + err.message);
+  })
+  .finally(() => {
+    btn.disabled = false;
+    btn.innerHTML = '☁️ Push to Google Sheet';
+  });
+}
+
+function downloadCSV() {
+  if (records.length === 0) return;
+  const header = 'ID,Name,Team,CheckedIn,Timestamp,ScannedBy';
+  const rows = records.map(r =>
+    `${r.id},"${r.name.replace(/"/g,'""')}","${r.team.replace(/"/g,'""')}",FALSE,,`
+  );
+  const csv = [header, ...rows].join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'event_checkin_sheet.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// Initial sample generation
+document.addEventListener('DOMContentLoaded', () => {
+  loadSample();
+  generate();
+});
+</script>
+</body>
+</html>
+

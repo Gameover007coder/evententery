@@ -1,0 +1,2812 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>EventPass — QR Check-In & Attendee Management</title>
+  <meta name="description" content="Modern Event Check-In Webapp with QR Scanning, Google Sheets live sync, and Badge Studio. Works seamlessly on phones and laptops.">
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet">
+
+  <!-- html5-qrcode for Camera Scanning -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+  <!-- qrcodejs for Badge Generation -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
+  <style>
+    :root {
+      --bg-dark: #090d16;
+      --bg-surface: #0f172a;
+      --bg-card: #131d33;
+      --bg-card-hover: #182440;
+      --border-color: rgba(255, 255, 255, 0.08);
+      --border-focus: rgba(16, 185, 129, 0.4);
+
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --text-dim: #64748b;
+
+      --primary: #10b981;
+      --primary-hover: #059669;
+      --primary-glow: rgba(16, 185, 129, 0.25);
+
+      --accent: #06b6d4;
+      --accent-glow: rgba(6, 182, 212, 0.2);
+
+      --warning: #f59e0b;
+      --warning-glow: rgba(245, 158, 11, 0.2);
+
+      --danger: #ef4444;
+      --danger-glow: rgba(239, 68, 68, 0.2);
+
+      --radius-sm: 8px;
+      --radius-md: 12px;
+      --radius-lg: 16px;
+      --radius-xl: 20px;
+
+      --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
+      --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.4);
+      --shadow-glow: 0 0 20px var(--primary-glow);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      background-color: var(--bg-dark);
+      color: var(--text-main);
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      line-height: 1.5;
+      overflow-x: hidden;
+    }
+
+    /* Ambient Background Glow */
+    body::before {
+      content: '';
+      position: fixed;
+      top: -10vw;
+      right: -10vw;
+      width: 45vw;
+      height: 45vw;
+      background: radial-gradient(circle, rgba(16, 185, 129, 0.08) 0%, transparent 70%);
+      border-radius: 50%;
+      pointer-events: none;
+      z-index: 0;
+    }
+    body::after {
+      content: '';
+      position: fixed;
+      bottom: -10vw;
+      left: -10vw;
+      width: 45vw;
+      height: 45vw;
+      background: radial-gradient(circle, rgba(6, 182, 212, 0.07) 0%, transparent 70%);
+      border-radius: 50%;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* Typography */
+    h1, h2, h3, h4, .font-heading {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+
+    .font-mono {
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    /* Top Navigation Bar (Desktop & Mobile) */
+    .app-header {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: rgba(9, 13, 22, 0.85);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border-bottom: 1px solid var(--border-color);
+      padding: 12px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      text-decoration: none;
+      color: inherit;
+    }
+
+    .brand-icon {
+      width: 38px;
+      height: 38px;
+      background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);
+      border-radius: var(--radius-sm);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.25rem;
+      box-shadow: var(--shadow-glow);
+    }
+
+    .brand-text h1 {
+      font-size: 1.15rem;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .brand-text .badge {
+      font-size: 0.68rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: rgba(16, 185, 129, 0.15);
+      color: var(--primary);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+
+    .header-status {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .status-pill {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      padding: 6px 12px;
+      border-radius: 999px;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .status-pill:hover {
+      border-color: rgba(255, 255, 255, 0.2);
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--warning);
+      box-shadow: 0 0 8px var(--warning-glow);
+    }
+    .status-dot.connected {
+      background: var(--primary);
+      box-shadow: 0 0 8px var(--primary-glow);
+    }
+    .status-dot.demo {
+      background: var(--accent);
+      box-shadow: 0 0 8px var(--accent-glow);
+    }
+    .status-dot.error {
+      background: var(--danger);
+      box-shadow: 0 0 8px var(--danger-glow);
+    }
+
+    /* Desktop Navigation Tabs */
+    .nav-tabs {
+      display: flex;
+      gap: 6px;
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid var(--border-color);
+      padding: 4px;
+      border-radius: var(--radius-md);
+    }
+
+    .nav-tab-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      padding: 8px 16px;
+      border-radius: var(--radius-sm);
+      font-size: 0.88rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.2s;
+    }
+
+    .nav-tab-btn:hover {
+      color: #fff;
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .nav-tab-btn.active {
+      background: var(--bg-card);
+      color: #fff;
+      box-shadow: var(--shadow-sm);
+      border: 1px solid var(--border-color);
+    }
+
+    /* Mobile Bottom Navigation Bar */
+    .mobile-bottom-nav {
+      display: none;
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 64px;
+      background: rgba(9, 13, 22, 0.95);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border-top: 1px solid var(--border-color);
+      z-index: 1000;
+      padding: 0 10px;
+    }
+
+    .mobile-nav-inner {
+      display: flex;
+      height: 100%;
+      align-items: center;
+      justify-content: space-around;
+    }
+
+    .mobile-nav-btn {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      background: transparent;
+      border: none;
+      color: var(--text-dim);
+      font-size: 0.7rem;
+      font-weight: 600;
+      padding: 8px 0;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .mobile-nav-btn .icon {
+      font-size: 1.25rem;
+    }
+
+    .mobile-nav-btn.active {
+      color: var(--primary);
+    }
+
+    /* Main Container */
+    .main-content {
+      flex: 1;
+      max-width: 1280px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 24px;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* Tab Panes */
+    .tab-pane {
+      display: none;
+      animation: fadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .tab-pane.active {
+      display: block;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Cards and Panels */
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-lg);
+      padding: 22px;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 18px;
+    }
+
+    .card-title {
+      font-size: 1.15rem;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .card-subtitle {
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    /* Buttons */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      background: var(--primary);
+      color: #052e16;
+      border: none;
+      padding: 10px 18px;
+      border-radius: var(--radius-md);
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+      box-shadow: 0 2px 10px rgba(16, 185, 129, 0.2);
+    }
+
+    .btn:hover {
+      background: var(--primary-hover);
+      color: #fff;
+      transform: translateY(-1px);
+      box-shadow: 0 4px 14px rgba(16, 185, 129, 0.3);
+    }
+
+    .btn:active {
+      transform: translateY(0);
+    }
+
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text-main);
+      border: 1px solid var(--border-color);
+      box-shadow: none;
+    }
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.1);
+      color: #fff;
+      border-color: rgba(255, 255, 255, 0.2);
+    }
+
+    .btn-accent {
+      background: var(--accent);
+      color: #042f2e;
+      box-shadow: 0 2px 10px rgba(6, 182, 212, 0.2);
+    }
+    .btn-accent:hover {
+      background: #0891b2;
+      color: #fff;
+    }
+
+    .btn-danger {
+      background: rgba(239, 68, 68, 0.15);
+      color: #fca5a5;
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      box-shadow: none;
+    }
+    .btn-danger:hover {
+      background: var(--danger);
+      color: #fff;
+    }
+
+    .btn-sm {
+      padding: 6px 12px;
+      font-size: 0.8rem;
+      border-radius: var(--radius-sm);
+    }
+
+    .btn-icon-only {
+      padding: 8px;
+      border-radius: var(--radius-sm);
+    }
+
+    /* Form Inputs */
+    .form-group {
+      margin-bottom: 16px;
+    }
+
+    .form-label {
+      display: block;
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+    }
+
+    .form-control {
+      width: 100%;
+      background: rgba(15, 23, 42, 0.8);
+      border: 1px solid var(--border-color);
+      color: #fff;
+      padding: 10px 14px;
+      border-radius: var(--radius-md);
+      font-size: 0.92rem;
+      font-family: inherit;
+      transition: all 0.2s;
+    }
+
+    .form-control:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15);
+      background: rgba(15, 23, 42, 1);
+    }
+
+    textarea.form-control {
+      resize: vertical;
+      min-height: 100px;
+    }
+
+    .form-hint {
+      font-size: 0.75rem;
+      color: var(--text-dim);
+      margin-top: 5px;
+    }
+
+    /* ------------------------------------------------------------- */
+    /* 1. DASHBOARD STYLES */
+    /* ------------------------------------------------------------- */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    .stat-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-lg);
+      padding: 20px;
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .stat-card::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      right: 0;
+      width: 80px;
+      height: 80px;
+      background: radial-gradient(circle, var(--stat-glow, rgba(255,255,255,0.04)) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    .stat-card.primary { --stat-glow: var(--primary-glow); }
+    .stat-card.accent { --stat-glow: var(--accent-glow); }
+    .stat-card.warning { --stat-glow: var(--warning-glow); }
+
+    .stat-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+
+    .stat-title {
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .stat-icon {
+      font-size: 1.4rem;
+    }
+
+    .stat-val {
+      font-size: 2.2rem;
+      font-weight: 800;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      color: #fff;
+      line-height: 1;
+    }
+
+    .stat-sub {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      margin-top: 8px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    /* Progress bar */
+    .progress-bar-wrap {
+      width: 100%;
+      height: 8px;
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 999px;
+      overflow: hidden;
+      margin-top: 10px;
+    }
+    .progress-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--primary), var(--accent));
+      width: 0%;
+      border-radius: 999px;
+      transition: width 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    /* Filter & Search Toolbar */
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .toolbar-left, .toolbar-right {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .search-box {
+      position: relative;
+      min-width: 260px;
+    }
+    .search-box input {
+      padding-left: 38px;
+    }
+    .search-box .search-icon {
+      position: absolute;
+      left: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--text-dim);
+      font-size: 0.95rem;
+    }
+
+    .filter-pills {
+      display: flex;
+      gap: 4px;
+      background: var(--bg-surface);
+      padding: 3px;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border-color);
+    }
+
+    .pill-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      font-size: 0.8rem;
+      font-weight: 600;
+      padding: 6px 12px;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .pill-btn.active {
+      background: var(--bg-card);
+      color: #fff;
+    }
+
+    /* Attendee Table / Cards */
+    .table-container {
+      overflow-x: auto;
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      background: var(--bg-surface);
+    }
+
+    table.data-table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: 0.88rem;
+    }
+
+    table.data-table th {
+      background: rgba(19, 29, 51, 0.6);
+      padding: 12px 16px;
+      font-weight: 600;
+      color: var(--text-muted);
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    table.data-table td {
+      padding: 14px 16px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+      color: var(--text-main);
+      vertical-align: middle;
+    }
+
+    table.data-table tr:hover td {
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    .tag-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+    .tag-id {
+      background: rgba(255, 255, 255, 0.06);
+      color: #cbd5e1;
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .tag-team {
+      background: rgba(6, 182, 212, 0.12);
+      color: #38bdf8;
+      border: 1px solid rgba(6, 182, 212, 0.25);
+    }
+    .tag-status-checked {
+      background: rgba(16, 185, 129, 0.15);
+      color: #34d399;
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+    .tag-status-pending {
+      background: rgba(245, 158, 11, 0.15);
+      color: #fbbf24;
+      border: 1px solid rgba(245, 158, 11, 0.3);
+    }
+
+    /* ------------------------------------------------------------- */
+    /* 2. GATE QR SCANNER STYLES */
+    /* ------------------------------------------------------------- */
+    .scanner-layout {
+      display: grid;
+      grid-template-columns: 1.1fr 0.9fr;
+      gap: 24px;
+    }
+
+    @media (max-width: 900px) {
+      .scanner-layout {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .scanner-viewport-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-lg);
+      padding: 20px;
+      text-align: center;
+    }
+
+    .camera-frame-wrap {
+      position: relative;
+      width: 100%;
+      max-width: 460px;
+      margin: 0 auto;
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      background: #000;
+      border: 2px solid var(--border-color);
+      aspect-ratio: 1 / 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    #qr-video-reader {
+      width: 100% !important;
+      height: 100% !important;
+      border: none !important;
+    }
+    #qr-video-reader video {
+      width: 100% !important;
+      height: 100% !important;
+      object-fit: cover !important;
+      border-radius: var(--radius-lg);
+    }
+
+    /* Targeting Reticle & Laser Animation */
+    .scan-reticle {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 220px;
+      height: 220px;
+      pointer-events: none;
+      z-index: 10;
+    }
+
+    .corner-bracket {
+      position: absolute;
+      width: 28px;
+      height: 28px;
+      border-color: var(--primary);
+      border-style: solid;
+    }
+    .corner-bracket.tl { top: 0; left: 0; border-width: 3px 0 0 3px; border-top-left-radius: 8px; }
+    .corner-bracket.tr { top: 0; right: 0; border-width: 3px 3px 0 0; border-top-right-radius: 8px; }
+    .corner-bracket.bl { bottom: 0; left: 0; border-width: 0 0 3px 3px; border-bottom-left-radius: 8px; }
+    .corner-bracket.br { bottom: 0; right: 0; border-width: 0 3px 3px 0; border-bottom-right-radius: 8px; }
+
+    .scan-laser-line {
+      position: absolute;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, var(--primary), transparent);
+      box-shadow: 0 0 10px var(--primary);
+      animation: scanLaser 2.2s ease-in-out infinite alternate;
+      top: 10%;
+    }
+
+    @keyframes scanLaser {
+      0% { top: 10%; opacity: 0.7; }
+      50% { opacity: 1; }
+      100% { top: 90%; opacity: 0.7; }
+    }
+
+    .scanner-controls {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      margin-top: 16px;
+      flex-wrap: wrap;
+    }
+
+    /* Result Banner Overlays */
+    .scan-feedback-banner {
+      margin-top: 16px;
+      padding: 16px 20px;
+      border-radius: var(--radius-md);
+      display: none;
+      animation: popIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    @keyframes popIn {
+      from { opacity: 0; transform: scale(0.96); }
+      to { opacity: 1; transform: scale(1); }
+    }
+
+    .scan-feedback-banner.success {
+      background: rgba(16, 185, 129, 0.15);
+      border: 1px solid var(--primary);
+      color: #34d399;
+    }
+    .scan-feedback-banner.duplicate {
+      background: rgba(245, 158, 11, 0.15);
+      border: 1px solid var(--warning);
+      color: #fbbf24;
+    }
+    .scan-feedback-banner.error {
+      background: rgba(239, 68, 68, 0.15);
+      border: 1px solid var(--danger);
+      color: #fca5a5;
+    }
+
+    .feedback-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 1.1rem;
+      font-weight: 700;
+    }
+    .feedback-body {
+      margin-top: 6px;
+      font-size: 0.88rem;
+      color: #e2e8f0;
+    }
+
+    /* Manual Entry Box */
+    .manual-entry-card {
+      margin-top: 18px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      padding: 14px;
+    }
+    .manual-row {
+      display: flex;
+      gap: 8px;
+    }
+
+    /* Session Log */
+    .session-log-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-lg);
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+    }
+
+    .session-log-list {
+      flex: 1;
+      max-height: 480px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-top: 12px;
+      padding-right: 4px;
+    }
+
+    .session-log-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      padding: 10px 14px;
+      font-size: 0.85rem;
+    }
+
+    /* ------------------------------------------------------------- */
+    /* 3. QR BADGE STUDIO & GENERATOR */
+    /* ------------------------------------------------------------- */
+    .badge-studio-layout {
+      display: grid;
+      grid-template-columns: 380px 1fr;
+      gap: 24px;
+    }
+
+    @media (max-width: 960px) {
+      .badge-studio-layout {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .badges-preview-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 18px;
+      margin-top: 16px;
+    }
+
+    /* Physical Printable Badge Design */
+    .badge-card {
+      background: #ffffff;
+      color: #0f172a;
+      border-radius: var(--radius-lg);
+      padding: 20px;
+      text-align: center;
+      position: relative;
+      box-shadow: var(--shadow-md);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      border-top: 6px solid var(--primary);
+      transition: transform 0.2s;
+    }
+    .badge-card:hover {
+      transform: translateY(-2px);
+    }
+
+    .badge-card.theme-dark {
+      background: #0f172a;
+      color: #f8fafc;
+      border: 1px solid var(--border-color);
+      border-top: 6px solid var(--primary);
+    }
+    .badge-card.theme-emerald {
+      border-top: 6px solid #10b981;
+    }
+    .badge-card.theme-indigo {
+      border-top: 6px solid #6366f1;
+    }
+
+    .badge-lanyard-hole {
+      width: 36px;
+      height: 8px;
+      border-radius: 999px;
+      background: #cbd5e1;
+      margin-bottom: 12px;
+    }
+    .badge-card.theme-dark .badge-lanyard-hole {
+      background: #334155;
+    }
+
+    .badge-event-title {
+      font-size: 0.78rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #64748b;
+      margin-bottom: 8px;
+    }
+
+    .badge-qr-wrap {
+      background: #ffffff;
+      padding: 10px;
+      border-radius: var(--radius-md);
+      display: inline-block;
+      margin: 10px 0;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+    }
+
+    .badge-attendee-name {
+      font-size: 1.15rem;
+      font-weight: 800;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      margin-bottom: 2px;
+    }
+
+    .badge-attendee-team {
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--accent);
+      margin-bottom: 6px;
+    }
+
+    .badge-attendee-id {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.72rem;
+      color: #94a3b8;
+      letter-spacing: 0.05em;
+    }
+
+    .badge-actions {
+      display: flex;
+      gap: 6px;
+      margin-top: 12px;
+      width: 100%;
+    }
+
+    /* ------------------------------------------------------------- */
+    /* 4. SETTINGS & INTEGRATION */
+    /* ------------------------------------------------------------- */
+    .settings-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+    }
+
+    @media (max-width: 900px) {
+      .settings-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .code-preview-box {
+      background: #050811;
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      padding: 14px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.78rem;
+      color: #94a3b8;
+      max-height: 280px;
+      overflow-y: auto;
+      white-space: pre;
+    }
+
+    /* Modal Component */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.75);
+      backdrop-filter: blur(8px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 2000;
+      padding: 20px;
+    }
+    .modal-overlay.active {
+      display: flex;
+    }
+
+    .modal-dialog {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-xl);
+      max-width: 520px;
+      width: 100%;
+      padding: 26px;
+      box-shadow: var(--shadow-md);
+      animation: modalSlide 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    @keyframes modalSlide {
+      from { opacity: 0; transform: translateY(12px) scale(0.98); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    /* Print Styles for ID Badges */
+    @media print {
+      body {
+        background: #ffffff !important;
+        color: #000000 !important;
+        padding: 0 !important;
+      }
+      .app-header, .mobile-bottom-nav, .nav-tabs, .badge-studio-sidebar, .toolbar, .btn, .card-header, #badge-print-hide {
+        display: none !important;
+      }
+      .tab-pane {
+        display: none !important;
+      }
+      #tab-badges {
+        display: block !important;
+      }
+      .badge-studio-layout {
+        display: block !important;
+      }
+      .badges-preview-grid {
+        display: grid !important;
+        grid-template-columns: repeat(3, 1fr) !important;
+        gap: 15px !important;
+      }
+      .badge-card {
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
+        border: 1px dashed #94a3b8 !important;
+        box-shadow: none !important;
+      }
+      .badge-actions {
+        display: none !important;
+      }
+    }
+
+    /* Responsive Mobile Tweaks */
+    @media (max-width: 768px) {
+      .app-header {
+        padding: 10px 16px;
+      }
+      .nav-tabs {
+        display: none; /* Hide top tabs on mobile, bottom bar is used */
+      }
+      .mobile-bottom-nav {
+        display: block;
+      }
+      .main-content {
+        padding: 16px 16px 80px 16px; /* Extra bottom padding for mobile bar */
+      }
+      .stats-grid {
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+      }
+      .stat-card {
+        padding: 14px;
+      }
+      .stat-val {
+        font-size: 1.6rem;
+      }
+      .camera-frame-wrap {
+        max-width: 320px;
+      }
+      .scan-reticle {
+        width: 170px;
+        height: 170px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top App Navigation Bar -->
+  <header class="app-header">
+    <a href="#dashboard" class="brand" onclick="switchTab('dashboard')">
+      <div class="brand-icon">🎫</div>
+      <div class="brand-text">
+        <h1>EventPass <span class="badge" id="env-badge">DEMO MODE</span></h1>
+      </div>
+    </a>
+
+    <!-- Navigation Tabs (Desktop) -->
+    <nav class="nav-tabs" id="desktop-nav-tabs">
+      <button class="nav-tab-btn active" id="tab-btn-dashboard" onclick="switchTab('dashboard')">
+        <span>📊</span> Dashboard
+      </button>
+      <button class="nav-tab-btn" id="tab-btn-scanner" onclick="switchTab('scanner')">
+        <span>📷</span> Gate Scanner
+      </button>
+      <button class="nav-tab-btn" id="tab-btn-badges" onclick="switchTab('badges')">
+        <span>🪪</span> Badge Studio
+      </button>
+      <button class="nav-tab-btn" id="tab-btn-settings" onclick="switchTab('settings')">
+        <span>⚙️</span> Settings
+      </button>
+    </nav>
+
+    <!-- Header Actions & Connection Indicator -->
+    <div class="header-status">
+      <div class="status-pill" id="conn-status-pill" onclick="switchTab('settings')" title="Click to view connection settings">
+        <div class="status-dot demo" id="conn-status-dot"></div>
+        <span id="conn-status-text">Demo Mode</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Mobile Bottom Navigation Bar -->
+  <nav class="mobile-bottom-nav">
+    <div class="mobile-nav-inner">
+      <button class="mobile-nav-btn active" id="m-tab-dashboard" onclick="switchTab('dashboard')">
+        <span class="icon">📊</span>
+        <span>Dashboard</span>
+      </button>
+      <button class="mobile-nav-btn" id="m-tab-scanner" onclick="switchTab('scanner')">
+        <span class="icon">📷</span>
+        <span>Scanner</span>
+      </button>
+      <button class="mobile-nav-btn" id="m-tab-badges" onclick="switchTab('badges')">
+        <span class="icon">🪪</span>
+        <span>Badges</span>
+      </button>
+      <button class="mobile-nav-btn" id="m-tab-settings" onclick="switchTab('settings')">
+        <span class="icon">⚙️</span>
+        <span>Settings</span>
+      </button>
+    </div>
+  </nav>
+
+  <!-- Main Application Area -->
+  <main class="main-content">
+
+    <!-- ============================================================= -->
+    <!-- TAB 1: ADMIN DASHBOARD -->
+    <!-- ============================================================= -->
+    <section class="tab-pane active" id="tab-dashboard">
+      <!-- High-Level Metric Cards -->
+      <div class="stats-grid">
+        <div class="stat-card primary">
+          <div class="stat-top">
+            <span class="stat-title">Checked In</span>
+            <span class="stat-icon">✅</span>
+          </div>
+          <div class="stat-val" id="stat-checked-in">0</div>
+          <div class="stat-sub">
+            <span id="stat-attendance-rate">0%</span> of registered attendees
+          </div>
+          <div class="progress-bar-wrap">
+            <div class="progress-bar-fill" id="stat-progress-bar"></div>
+          </div>
+        </div>
+
+        <div class="stat-card warning">
+          <div class="stat-top">
+            <span class="stat-title">Pending Arrival</span>
+            <span class="stat-icon">⏳</span>
+          </div>
+          <div class="stat-val" id="stat-pending">0</div>
+          <div class="stat-sub">Awaiting at gate</div>
+        </div>
+
+        <div class="stat-card accent">
+          <div class="stat-top">
+            <span class="stat-title">Total Registered</span>
+            <span class="stat-icon">👥</span>
+          </div>
+          <div class="stat-val" id="stat-total">0</div>
+          <div class="stat-sub">Across all teams</div>
+        </div>
+
+        <div class="stat-card">
+          <div class="stat-top">
+            <span class="stat-title">Sync Status</span>
+            <span class="stat-icon">⚡</span>
+          </div>
+          <div class="stat-val" style="font-size:1.4rem;" id="stat-last-sync">Just now</div>
+          <div class="stat-sub" id="stat-sync-label">Local preview state</div>
+        </div>
+      </div>
+
+      <!-- Attendee Management Card -->
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <h2 class="card-title">Attendee Directory</h2>
+            <p class="card-subtitle">Live check-in status from Google Sheets database</p>
+          </div>
+          <div class="toolbar-right">
+            <button class="btn btn-sm btn-secondary" onclick="openAddAttendeeModal()">
+              <span>➕</span> Add Attendee
+            </button>
+            <button class="btn btn-sm btn-secondary" id="btn-refresh-data" onclick="fetchData()">
+              <span>🔄</span> Refresh
+            </button>
+            <button class="btn btn-sm btn-secondary" onclick="exportCSV()">
+              <span>📥</span> Export CSV
+            </button>
+          </div>
+        </div>
+
+        <!-- Filter & Search Toolbar -->
+        <div class="toolbar">
+          <div class="toolbar-left">
+            <div class="search-box">
+              <span class="search-icon">🔍</span>
+              <input type="text" class="form-control" id="search-input" placeholder="Search by name, team, or ID..." oninput="filterAttendees()">
+            </div>
+            <div class="filter-pills">
+              <button class="pill-btn active" id="filter-all" onclick="setStatusFilter('all')">All</button>
+              <button class="pill-btn" id="filter-checked" onclick="setStatusFilter('checked')">Checked In</button>
+              <button class="pill-btn" id="filter-pending" onclick="setStatusFilter('pending')">Pending</button>
+            </div>
+          </div>
+          <div class="toolbar-right">
+            <select class="form-control" id="team-filter-select" style="width: auto;" onchange="filterAttendees()">
+              <option value="">All Teams</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Data Table -->
+        <div class="table-container">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Attendee</th>
+                <th>Team</th>
+                <th>ID Code</th>
+                <th>Status</th>
+                <th>Check-In Time</th>
+                <th>Scanned By</th>
+                <th style="text-align:right;">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="attendee-tbody">
+              <!-- Dynamically populated -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================= -->
+    <!-- TAB 2: GATE QR SCANNER -->
+    <!-- ============================================================= -->
+    <section class="tab-pane" id="tab-scanner">
+      <div class="scanner-layout">
+        <!-- Viewport & Scan Controls -->
+        <div class="scanner-viewport-card">
+          <div class="card-header" style="justify-content:center; text-align:center; margin-bottom:14px;">
+            <div>
+              <h2 class="card-title" style="justify-content:center;">Gate Check-In Camera</h2>
+              <p class="card-subtitle">Scan attendee QR pass on mobile rear camera or laptop webcam</p>
+            </div>
+          </div>
+
+          <!-- Camera Viewport Box -->
+          <div class="camera-frame-wrap" id="camera-viewport-container">
+            <div id="qr-video-reader"></div>
+            <!-- Target Reticle & Laser -->
+            <div class="scan-reticle" id="scanner-reticle">
+              <div class="corner-bracket tl"></div>
+              <div class="corner-bracket tr"></div>
+              <div class="corner-bracket bl"></div>
+              <div class="corner-bracket br"></div>
+              <div class="scan-laser-line"></div>
+            </div>
+          </div>
+
+          <!-- Camera Selection & Controls -->
+          <div class="scanner-controls">
+            <select class="form-control" id="camera-select" style="max-width: 220px;" onchange="onCameraChange()">
+              <option value="">Detecting cameras...</option>
+            </select>
+            <button class="btn btn-secondary btn-sm" id="btn-toggle-camera" onclick="toggleCameraStream()">
+              <span>⏸️</span> Pause Scanner
+            </button>
+            <button class="btn btn-secondary btn-sm" id="btn-switch-cam" onclick="cycleCamera()">
+              <span>🔄</span> Flip Camera
+            </button>
+          </div>
+
+          <!-- Scan Feedback Overlay -->
+          <div class="scan-feedback-banner" id="scan-feedback-banner">
+            <div class="feedback-header">
+              <span id="feedback-icon">✅</span>
+              <span id="feedback-title">Checked In Successfully</span>
+            </div>
+            <div class="feedback-body" id="feedback-detail">
+              Alex Chen • Team Falcons
+            </div>
+          </div>
+
+          <!-- Manual Code Entry Fallback -->
+          <div class="manual-entry-card">
+            <div class="form-label">Keyboard Fallback (Camera not working or barcode damaged):</div>
+            <div class="manual-row">
+              <input type="text" class="form-control font-mono" id="manual-code-input" placeholder="e.g. ATT-7K2P9M" style="text-transform:uppercase;" onkeydown="if(event.key==='Enter') submitManualCheckIn()">
+              <button class="btn btn-accent" onclick="submitManualCheckIn()">Check In</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Session Scan History & Gatekeeper Info -->
+        <div class="session-log-card">
+          <div class="card-header">
+            <div>
+              <h2 class="card-title">Live Gate Feed</h2>
+              <p class="card-subtitle">Session Scans: <strong id="session-scan-count" style="color:var(--primary);">0</strong> attendees</p>
+            </div>
+            <button class="btn btn-sm btn-secondary" onclick="clearSessionHistory()">Clear Feed</button>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="gate-operator-name">Gate Label / Operator Name:</label>
+            <input type="text" class="form-control" id="gate-operator-name" value="Gate 1 - Front Desk" onchange="saveGateOperator()">
+          </div>
+
+          <div class="session-log-list" id="session-log-list">
+            <div style="text-align:center; color:var(--text-dim); padding: 40px 10px;">
+              Ready to scan. Point camera at an attendee's QR code.
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================= -->
+    <!-- TAB 3: QR BADGE STUDIO & BULK GENERATOR -->
+    <!-- ============================================================= -->
+    <section class="tab-pane" id="tab-badges">
+      <div class="badge-studio-layout">
+        <!-- Badge Studio Sidebar / Generator -->
+        <div class="badge-studio-sidebar">
+          <div class="card">
+            <div class="card-header">
+              <div>
+                <h2 class="card-title">Badge Studio</h2>
+                <p class="card-subtitle">Generate passes & push to Sheet</p>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Event Name</label>
+              <input type="text" class="form-control" id="badge-event-name" value="TechSummit 2026" oninput="updateAllBadges()">
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Badge Theme</label>
+              <select class="form-control" id="badge-theme-select" onchange="updateBadgeTheme()">
+                <option value="theme-white">Clean White (Print-Friendly)</option>
+                <option value="theme-dark">Cyber Dark</option>
+                <option value="theme-emerald">Emerald Pro</option>
+                <option value="theme-indigo">Royal Indigo</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Grouping Mode</label>
+              <select class="form-control" id="generator-mode-select" onchange="onGeneratorModeChange()">
+                <option value="individual">Individual Attendee Passes</option>
+                <option value="team">Team Leader Pass (1 per Team)</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Attendee List (CSV or Paste)</label>
+              <textarea class="form-control font-mono" id="generator-csv-input" rows="6" placeholder="Name,Team&#10;Alex Chen,Falcons&#10;Priya Nair,Falcons&#10;Sam Diaz,Ravens&#10;Maria Gomez,Engineering"></textarea>
+              <div class="form-hint">Format: <code>Name,Team</code> (One per line). Header optional.</div>
+            </div>
+
+            <div style="display:flex; flex-direction:column; gap:8px;">
+              <button class="btn" onclick="generateBadgesFromInput()">
+                <span>⚡</span> Generate Badges
+              </button>
+              <button class="btn btn-secondary" onclick="loadSampleCSV()">
+                <span>📄</span> Load Sample Data
+              </button>
+            </div>
+
+            <hr style="border:0; border-top:1px solid var(--border-color); margin:18px 0;">
+
+            <div style="display:flex; flex-direction:column; gap:8px;">
+              <button class="btn btn-accent" id="btn-push-to-sheet" onclick="pushGeneratedToSheet()">
+                <span>☁️</span> Push Attendees to Google Sheet
+              </button>
+              <button class="btn btn-secondary" onclick="window.print()">
+                <span>🖨️</span> Print Badges / Save PDF
+              </button>
+              <button class="btn btn-secondary" onclick="downloadBadgesCSV()">
+                <span>📥</span> Download Sheet CSV
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Badges Live Preview Grid -->
+        <div class="badge-studio-preview">
+          <div class="card" style="background:transparent; border:none; padding:0;">
+            <div class="card-header" id="badge-print-hide">
+              <div>
+                <h2 class="card-title">Live Badge Passes (<span id="badge-count-label">0</span>)</h2>
+                <p class="card-subtitle">High-contrast scannable QR passes ready to print or distribute</p>
+              </div>
+            </div>
+
+            <div class="badges-preview-grid" id="badges-container">
+              <!-- Generated Badges appear here -->
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================= -->
+    <!-- TAB 4: SETTINGS & GOOGLE SHEETS DEPLOYMENT -->
+    <!-- ============================================================= -->
+    <section class="tab-pane" id="tab-settings">
+      <div class="settings-grid">
+        <!-- Configuration Card -->
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h2 class="card-title">Google Sheets Integration</h2>
+              <p class="card-subtitle">Connect your Google Apps Script API endpoint</p>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="settings-script-url">Google Apps Script Web App URL</label>
+            <input type="url" class="form-control font-mono" id="settings-script-url" placeholder="https://script.google.com/macros/s/AKfycb.../exec">
+            <div class="form-hint">Paste the deployment URL from your Google Apps Script project. Saved in your browser.</div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="settings-passcode">API Passcode (Optional)</label>
+            <input type="password" class="form-control" id="settings-passcode" placeholder="Leave blank if OPTIONAL_PASSCODE is empty">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="settings-auto-refresh">Auto-Refresh Interval</label>
+            <select class="form-control" id="settings-auto-refresh" onchange="updateAutoRefreshSetting()">
+              <option value="0">Manual Refresh Only</option>
+              <option value="5">Every 5 Seconds (High Traffic)</option>
+              <option value="15" selected>Every 15 Seconds (Recommended)</option>
+              <option value="30">Every 30 Seconds</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Audio & Haptic Feedback</label>
+            <div style="display:flex; gap:16px; margin-top:8px;">
+              <label style="display:flex; align-items:center; gap:8px; font-size:0.9rem; cursor:pointer;">
+                <input type="checkbox" id="setting-sound-fx" checked onchange="savePreferences()"> Sound Chimes
+              </label>
+              <label style="display:flex; align-items:center; gap:8px; font-size:0.9rem; cursor:pointer;">
+                <input type="checkbox" id="setting-haptic-fx" checked onchange="savePreferences()"> Vibration
+              </label>
+            </div>
+          </div>
+
+          <div style="display:flex; gap:10px; margin-top:20px;">
+            <button class="btn" onclick="saveSettingsAndTest()">
+              <span>💾</span> Save & Test Connection
+            </button>
+            <button class="btn btn-secondary" onclick="toggleDemoMode()">
+              <span id="demo-mode-btn-text">Switch to Live Mode</span>
+            </button>
+          </div>
+
+          <div id="connection-test-result" style="margin-top:14px; font-size:0.85rem;"></div>
+        </div>
+
+        <!-- Setup Instructions & Backend Reference -->
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h2 class="card-title">Backend Deployment Guide</h2>
+              <p class="card-subtitle">Quick instructions to launch in 2 minutes</p>
+            </div>
+            <button class="btn btn-sm btn-secondary" onclick="copyBackendCode()">
+              <span>📋</span> Copy Script
+            </button>
+          </div>
+
+          <div style="font-size:0.85rem; color:var(--text-muted); line-height:1.6; margin-bottom:14px;">
+            <ol style="padding-left: 20px; display:flex; flex-direction:column; gap:6px;">
+              <li>Open your Google Sheet (or create a new blank one).</li>
+              <li>Go to <strong>Extensions &gt; Apps Script</strong> in the menu.</li>
+              <li>Paste the code from <strong style="color:#fff;">CheckInBackend.gs</strong> into <code>Code.gs</code>.</li>
+              <li>Click <strong>Deploy &gt; New deployment</strong>.</li>
+              <li>Select type: <strong>Web app</strong>, Execute as: <strong>Me</strong>, Access: <strong>Anyone</strong>.</li>
+              <li>Authorize permissions and copy the <strong>Web App URL</strong> here!</li>
+            </ol>
+          </div>
+
+          <label class="form-label">Backend Script Preview (CheckInBackend.gs):</label>
+          <div class="code-preview-box" id="code-snippet-preview">// CheckInBackend.gs v2.0
+// Columns: ID | Name | Team | CheckedIn | Timestamp | ScannedBy
+const SHEET_NAME = 'CheckIns';
+function doPost(e) { /* Handles checkin, toggle, batchAdd */ }
+function doGet(e) { /* Handles stats, list, ping */ }
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ============================================================= -->
+  <!-- MODAL: SINGLE ATTENDEE QR BADGE PREVIEW -->
+  <!-- ============================================================= -->
+  <div class="modal-overlay" id="badge-modal" onclick="if(event.target===this) closeBadgeModal()">
+    <div class="modal-dialog">
+      <div class="card-header" style="margin-bottom:12px;">
+        <h3 class="card-title" id="modal-badge-title">Attendee Pass</h3>
+        <button class="btn btn-secondary btn-icon-only" onclick="closeBadgeModal()">✕</button>
+      </div>
+      <div id="modal-badge-content" style="display:flex; justify-content:center; padding:10px 0;">
+        <!-- Injected Badge -->
+      </div>
+      <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:16px;">
+        <button class="btn btn-secondary" onclick="closeBadgeModal()">Close</button>
+        <button class="btn" onclick="printSingleModalBadge()">Print Pass</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================= -->
+  <!-- MODAL: ADD ATTENDEE -->
+  <!-- ============================================================= -->
+  <div class="modal-overlay" id="add-attendee-modal" onclick="if(event.target===this) closeAddAttendeeModal()">
+    <div class="modal-dialog">
+      <div class="card-header" style="margin-bottom:12px;">
+        <h3 class="card-title">Add New Attendee</h3>
+        <button class="btn btn-secondary btn-icon-only" onclick="closeAddAttendeeModal()">✕</button>
+      </div>
+      <form onsubmit="event.preventDefault(); submitNewAttendee();">
+        <div class="form-group">
+          <label class="form-label">Full Name *</label>
+          <input type="text" class="form-control" id="new-att-name" required placeholder="e.g. Jordan Miller">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Team / Organization</label>
+          <input type="text" class="form-control" id="new-att-team" placeholder="e.g. Design Team">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Attendee ID Code (Leave blank to auto-generate)</label>
+          <input type="text" class="form-control font-mono" id="new-att-id" placeholder="e.g. ATT-9K2L4P" style="text-transform:uppercase;">
+        </div>
+        <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:20px;">
+          <button type="button" class="btn btn-secondary" onclick="closeAddAttendeeModal()">Cancel</button>
+          <button type="submit" class="btn">Add to Directory</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ============================================================= -->
+  <!-- JAVASCRIPT APPLICATION CORE -->
+  <!-- ============================================================= -->
+  <script>
+    // Global Application State
+    const AppState = {
+      scriptUrl: localStorage.getItem('eventCheckin_scriptUrl') || '',
+      gateOperator: localStorage.getItem('eventCheckin_gateName') || 'Gate 1 - Front Desk',
+      passcode: localStorage.getItem('eventCheckin_passcode') || '',
+      isDemoMode: localStorage.getItem('eventCheckin_demoMode') !== 'false',
+      soundEnabled: localStorage.getItem('eventCheckin_soundEnabled') !== 'false',
+      vibrateEnabled: localStorage.getItem('eventCheckin_vibrateEnabled') !== 'false',
+      eventName: localStorage.getItem('eventCheckin_eventName') || 'TechSummit 2026',
+      autoRefreshInterval: parseInt(localStorage.getItem('eventCheckin_autoRefresh') || '15', 10),
+
+      // Data Store
+      attendees: [],
+      filteredAttendees: [],
+      statusFilter: 'all',
+      searchQuery: '',
+      teamFilter: '',
+      sessionScans: [],
+      isScanningActive: false,
+      lastSyncTime: null,
+      autoRefreshTimer: null,
+
+      // Hardware
+      html5QrCode: null,
+      cameras: [],
+      currentCameraId: null,
+      isProcessingScan: false
+    };
+
+    // Realistic Demo Dataset
+    const DEMO_ATTENDEES = [
+      { id: 'ATT-7K2P9M', name: 'Alex Chen', team: 'Engineering', checkedIn: true, timestamp: '09:05:14', scannedBy: 'Gate 1' },
+      { id: 'ATT-3X8W4L', name: 'Priya Nair', team: 'Design', checkedIn: true, timestamp: '09:12:30', scannedBy: 'Gate 1' },
+      { id: 'ATT-9N5Q2V', name: 'Marcus Vance', team: 'Product', checkedIn: false, timestamp: '', scannedBy: '' },
+      { id: 'ATT-4R8T1K', name: 'Elena Rostova', team: 'Engineering', checkedIn: false, timestamp: '', scannedBy: '' },
+      { id: 'ATT-6Y2B7D', name: 'Sam Diaz', team: 'Leadership', checkedIn: true, timestamp: '09:18:45', scannedBy: 'VIP Gate' },
+      { id: 'ATT-1M9C5Z', name: 'Jo Lin', team: 'Design', checkedIn: false, timestamp: '', scannedBy: '' },
+      { id: 'ATT-8H4F3P', name: 'Tariq Mansour', team: 'Marketing', checkedIn: false, timestamp: '', scannedBy: '' },
+      { id: 'ATT-5D2J8W', name: 'Sarah Connor', team: 'Operations', checkedIn: false, timestamp: '', scannedBy: '' }
+    ];
+
+    // Initialize App on DOM Load
+    document.addEventListener('DOMContentLoaded', () => {
+      initSettingsUI();
+      initNavigation();
+      initAudioContext();
+
+      // If no script URL is stored, default to Demo Mode
+      if (!AppState.scriptUrl) {
+        AppState.isDemoMode = true;
+      }
+      updateStatusBadge();
+
+      // Load initial data
+      if (AppState.isDemoMode) {
+        AppState.attendees = JSON.parse(localStorage.getItem('eventCheckin_demoData') || JSON.stringify(DEMO_ATTENDEES));
+        renderDashboard();
+      } else {
+        fetchData();
+      }
+
+      setupAutoRefresh();
+
+      // Populate default Badges
+      loadSampleCSV();
+      generateBadgesFromInput();
+    });
+
+    // -----------------------------------------------------------------
+    // NAVIGATION & TAB SWITCHING
+    // -----------------------------------------------------------------
+    function initNavigation() {
+      // Check hash in URL
+      const hash = window.location.hash.replace('#', '');
+      if (['dashboard', 'scanner', 'badges', 'settings'].includes(hash)) {
+        switchTab(hash);
+      }
+    }
+
+    function switchTab(tabId) {
+      // Update Top Nav
+      document.querySelectorAll('.nav-tab-btn').forEach(btn => btn.classList.remove('active'));
+      const activeTopBtn = document.getElementById(`tab-btn-${tabId}`);
+      if (activeTopBtn) activeTopBtn.classList.add('active');
+
+      // Update Mobile Nav
+      document.querySelectorAll('.mobile-nav-btn').forEach(btn => btn.classList.remove('active'));
+      const activeMobBtn = document.getElementById(`m-tab-${tabId}`);
+      if (activeMobBtn) activeMobBtn.classList.add('active');
+
+      // Update Panes
+      document.querySelectorAll('.tab-pane').forEach(pane => pane.classList.remove('active'));
+      const activePane = document.getElementById(`tab-pane-${tabId}`) || document.getElementById(`tab-${tabId}`);
+      if (activePane) activePane.classList.add('active');
+
+      window.location.hash = tabId;
+
+      // Special handling for scanner camera
+      if (tabId === 'scanner') {
+        startCameraStream();
+      } else {
+        stopCameraStream();
+      }
+    }
+
+    // -----------------------------------------------------------------
+    // AUDIO & HAPTIC SYNTHESIS (Web Audio API - No External Files)
+    // -----------------------------------------------------------------
+    let audioCtx = null;
+    function initAudioContext() {
+      try {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        audioCtx = new AudioContext();
+      } catch (e) {
+        console.warn('Web Audio API not supported in this browser.');
+      }
+    }
+
+    function playSound(type) {
+      if (!AppState.soundEnabled || !audioCtx) return;
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+
+      const now = audioCtx.currentTime;
+
+      if (type === 'success') {
+        // High pleasant arpeggio chime (C6 -> E6 -> G6)
+        [1046.50, 1318.51, 1567.98].forEach((freq, i) => {
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(freq, now + i * 0.08);
+          gain.gain.setValueAtTime(0.2, now + i * 0.08);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.08 + 0.25);
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
+          osc.start(now + i * 0.08);
+          osc.stop(now + i * 0.08 + 0.26);
+        });
+      } else if (type === 'warning') {
+        // Double warning ping
+        [440, 440].forEach((freq, i) => {
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(freq, now + i * 0.12);
+          gain.gain.setValueAtTime(0.25, now + i * 0.12);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.12 + 0.15);
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
+          osc.start(now + i * 0.12);
+          osc.stop(now + i * 0.12 + 0.16);
+        });
+      } else if (type === 'error') {
+        // Low buzz tone
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(150, now);
+        osc.frequency.linearRampToValueAtTime(110, now + 0.3);
+        gain.gain.setValueAtTime(0.3, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start(now);
+        osc.stop(now + 0.31);
+      }
+    }
+
+    function triggerHaptic(pattern) {
+      if (AppState.vibrateEnabled && navigator.vibrate) {
+        navigator.vibrate(pattern);
+      }
+    }
+
+    // -----------------------------------------------------------------
+    // DASHBOARD & DATA RENDERING
+    // -----------------------------------------------------------------
+    function renderDashboard() {
+      const total = AppState.attendees.length;
+      const checkedIn = AppState.attendees.filter(a => a.checkedIn).length;
+      const pending = total - checkedIn;
+      const rate = total > 0 ? Math.round((checkedIn / total) * 100) : 0;
+
+      // Update Metric Numbers
+      document.getElementById('stat-total').textContent = total;
+      document.getElementById('stat-checked-in').textContent = checkedIn;
+      document.getElementById('stat-pending').textContent = pending;
+      document.getElementById('stat-attendance-rate').textContent = `${rate}%`;
+      document.getElementById('stat-progress-bar').style.width = `${rate}%`;
+
+      // Update sync time
+      const timeStr = AppState.lastSyncTime ? AppState.lastSyncTime.toLocaleTimeString() : 'Just now';
+      document.getElementById('stat-last-sync').textContent = timeStr;
+      document.getElementById('stat-sync-label').textContent = AppState.isDemoMode ? 'Demo preview data' : 'Synced with Google Sheet';
+
+      // Update Teams Filter dropdown
+      updateTeamsDropdown();
+
+      // Render Table
+      filterAttendees();
+    }
+
+    function updateTeamsDropdown() {
+      const select = document.getElementById('team-filter-select');
+      const currentVal = select.value;
+      const teams = Array.from(new Set(AppState.attendees.map(a => a.team).filter(Boolean))).sort();
+
+      select.innerHTML = '<option value="">All Teams</option>';
+      teams.forEach(t => {
+        const opt = document.createElement('option');
+        opt.value = t;
+        opt.textContent = t;
+        if (t === currentVal) opt.selected = true;
+        select.appendChild(opt);
+      });
+    }
+
+    function setStatusFilter(status) {
+      AppState.statusFilter = status;
+      document.getElementById('filter-all').classList.toggle('active', status === 'all');
+      document.getElementById('filter-checked').classList.toggle('active', status === 'checked');
+      document.getElementById('filter-pending').classList.toggle('active', status === 'pending');
+      filterAttendees();
+    }
+
+    function filterAttendees() {
+      const query = document.getElementById('search-input').value.trim().toLowerCase();
+      const team = document.getElementById('team-filter-select').value;
+      const status = AppState.statusFilter;
+
+      AppState.filteredAttendees = AppState.attendees.filter(att => {
+        // Search query
+        const matchQuery = !query ||
+          (att.name && att.name.toLowerCase().includes(query)) ||
+          (att.team && att.team.toLowerCase().includes(query)) ||
+          (att.id && att.id.toLowerCase().includes(query));
+
+        // Team filter
+        const matchTeam = !team || att.team === team;
+
+        // Status filter
+        let matchStatus = true;
+        if (status === 'checked') matchStatus = att.checkedIn;
+        if (status === 'pending') matchStatus = !att.checkedIn;
+
+        return matchQuery && matchTeam && matchStatus;
+      });
+
+      renderAttendeeTable();
+    }
+
+    function renderAttendeeTable() {
+      const tbody = document.getElementById('attendee-tbody');
+      tbody.innerHTML = '';
+
+      if (AppState.filteredAttendees.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="7" style="text-align:center; color:var(--text-dim); padding:32px;">
+              No matching attendees found.
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
+      AppState.filteredAttendees.forEach(att => {
+        const tr = document.createElement('tr');
+
+        const statusTag = att.checkedIn
+          ? `<span class="tag-badge tag-status-checked">● Checked In</span>`
+          : `<span class="tag-badge tag-status-pending">○ Pending</span>`;
+
+        const toggleBtn = att.checkedIn
+          ? `<button class="btn btn-sm btn-secondary" onclick="toggleAttendeeStatus('${att.id}')" title="Undo Check-In">Undo</button>`
+          : `<button class="btn btn-sm" onclick="toggleAttendeeStatus('${att.id}')">Check In</button>`;
+
+        tr.innerHTML = `
+          <td>
+            <div style="font-weight:600; color:#fff;">${escapeHtml(att.name)}</div>
+          </td>
+          <td>
+            ${att.team ? `<span class="tag-badge tag-team">${escapeHtml(att.team)}</span>` : '<span style="color:var(--text-dim);">-</span>'}
+          </td>
+          <td>
+            <span class="tag-badge tag-id">${escapeHtml(att.id)}</span>
+          </td>
+          <td>${statusTag}</td>
+          <td class="font-mono" style="font-size:0.8rem; color:var(--text-muted);">
+            ${att.timestamp || '<span style="color:var(--text-dim);">-</span>'}
+          </td>
+          <td style="font-size:0.82rem; color:var(--text-muted);">
+            ${att.scannedBy || '<span style="color:var(--text-dim);">-</span>'}
+          </td>
+          <td style="text-align:right;">
+            <div style="display:inline-flex; gap:6px;">
+              ${toggleBtn}
+              <button class="btn btn-sm btn-secondary btn-icon-only" onclick="openBadgeModal('${att.id}')" title="View QR Badge">🪪</button>
+            </div>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    // Toggle check-in status from directory
+    function toggleAttendeeStatus(id) {
+      const att = AppState.attendees.find(a => a.id === id);
+      if (!att) return;
+
+      const newStatus = !att.checkedIn;
+      const now = new Date();
+      const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+      if (AppState.isDemoMode) {
+        att.checkedIn = newStatus;
+        att.timestamp = newStatus ? timeStr : '';
+        att.scannedBy = newStatus ? AppState.gateOperator : '';
+        localStorage.setItem('eventCheckin_demoData', JSON.stringify(AppState.attendees));
+        renderDashboard();
+        if (newStatus) {
+          addSessionLog('success', att.name, att.team, att.id, timeStr);
+          playSound('success');
+        }
+        return;
+      }
+
+      // Live Google Apps Script POST call
+      fetch(AppState.scriptUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({
+          action: 'toggle',
+          id: id,
+          checkedIn: newStatus,
+          scannedBy: AppState.gateOperator,
+          passcode: AppState.passcode
+        })
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.status === 'success') {
+          att.checkedIn = newStatus;
+          att.timestamp = newStatus ? data.timestamp : '';
+          att.scannedBy = newStatus ? AppState.gateOperator : '';
+          renderDashboard();
+          if (newStatus) playSound('success');
+        } else {
+          alert('Could not update status: ' + (data.message || 'Error'));
+        }
+      })
+      .catch(err => {
+        alert('Network error communicating with Google Apps Script: ' + err.message);
+      });
+    }
+
+    // Fetch live data from Google Sheets
+    function fetchData() {
+      if (AppState.isDemoMode) {
+        AppState.lastSyncTime = new Date();
+        renderDashboard();
+        return;
+      }
+
+      if (!AppState.scriptUrl) {
+        updateStatusBadge();
+        return;
+      }
+
+      const refreshBtn = document.getElementById('btn-refresh-data');
+      if (refreshBtn) refreshBtn.classList.add('loading');
+
+      const url = `${AppState.scriptUrl}?action=list${AppState.passcode ? '&passcode=' + encodeURIComponent(AppState.passcode) : ''}`;
+
+      fetch(url)
+        .then(res => res.json())
+        .then(data => {
+          if (data.status === 'success') {
+            AppState.attendees = data.records || [];
+            AppState.lastSyncTime = new Date();
+            updateStatusBadge('connected');
+            renderDashboard();
+          } else {
+            console.error('API Error:', data.message);
+            updateStatusBadge('error');
+          }
+        })
+        .catch(err => {
+          console.error('Network Error:', err);
+          updateStatusBadge('error');
+        })
+        .finally(() => {
+          if (refreshBtn) refreshBtn.classList.remove('loading');
+        });
+    }
+
+    function setupAutoRefresh() {
+      if (AppState.autoRefreshTimer) clearInterval(AppState.autoRefreshTimer);
+      if (AppState.autoRefreshInterval > 0) {
+        AppState.autoRefreshTimer = setInterval(() => {
+          fetchData();
+        }, AppState.autoRefreshInterval * 1000);
+      }
+    }
+
+    // -----------------------------------------------------------------
+    // QR SCANNER (CAMERA & SCAN LIFECYCLE)
+    // -----------------------------------------------------------------
+    function startCameraStream() {
+      if (AppState.isScanningActive) return;
+
+      const qrContainer = document.getElementById('qr-video-reader');
+      if (!qrContainer) return;
+
+      if (!AppState.html5QrCode) {
+        AppState.html5QrCode = new Html5Qrcode('qr-video-reader');
+      }
+
+      Html5Qrcode.getCameras().then(devices => {
+        AppState.cameras = devices;
+        populateCameraSelector(devices);
+
+        if (devices && devices.length) {
+          // Prefer back/environment camera on phones
+          const backCam = devices.find(d => /back|rear|environment/i.test(d.label));
+          AppState.currentCameraId = backCam ? backCam.id : devices[0].id;
+          launchCamera(AppState.currentCameraId);
+        } else {
+          showScanFeedback('error', '⚠️', 'No camera detected', 'Please allow camera access or use the keyboard fallback.');
+        }
+      }).catch(err => {
+        console.warn('Camera enumeration error:', err);
+        showScanFeedback('error', '⚠️', 'Camera permission denied', 'Please enable camera permissions in your browser.');
+      });
+    }
+
+    function populateCameraSelector(devices) {
+      const select = document.getElementById('camera-select');
+      select.innerHTML = '';
+      devices.forEach((dev, idx) => {
+        const opt = document.createElement('option');
+        opt.value = dev.id;
+        opt.textContent = dev.label || `Camera ${idx + 1}`;
+        select.appendChild(opt);
+      });
+      if (AppState.currentCameraId) select.value = AppState.currentCameraId;
+    }
+
+    function launchCamera(cameraId) {
+      if (!AppState.html5QrCode) return;
+
+      AppState.html5QrCode.start(
+        cameraId,
+        {
+          fps: 12,
+          qrbox: { width: 220, height: 220 },
+          aspectRatio: 1.0
+        },
+        onQrCodeScanned,
+        () => {} // suppress per-frame misses
+      ).then(() => {
+        AppState.isScanningActive = true;
+        AppState.currentCameraId = cameraId;
+        document.getElementById('btn-toggle-camera').innerHTML = '<span>⏸️</span> Pause Scanner';
+        document.getElementById('camera-select').value = cameraId;
+      }).catch(err => {
+        console.error('Error starting camera:', err);
+        showScanFeedback('error', '⚠️', 'Unable to start camera', err.message || 'Camera is in use by another app.');
+      });
+    }
+
+    function stopCameraStream() {
+      if (AppState.html5QrCode && AppState.isScanningActive) {
+        AppState.html5QrCode.stop().then(() => {
+          AppState.isScanningActive = false;
+          document.getElementById('btn-toggle-camera').innerHTML = '<span>▶️</span> Start Scanner';
+        }).catch(() => {});
+      }
+    }
+
+    function toggleCameraStream() {
+      if (AppState.isScanningActive) {
+        stopCameraStream();
+      } else {
+        if (AppState.currentCameraId) {
+          launchCamera(AppState.currentCameraId);
+        } else {
+          startCameraStream();
+        }
+      }
+    }
+
+    function cycleCamera() {
+      if (AppState.cameras.length < 2) return;
+      const currentIndex = AppState.cameras.findIndex(c => c.id === AppState.currentCameraId);
+      const nextIndex = (currentIndex + 1) % AppState.cameras.length;
+      AppState.currentCameraId = AppState.cameras[nextIndex].id;
+
+      if (AppState.isScanningActive) {
+        AppState.html5QrCode.stop().then(() => {
+          launchCamera(AppState.currentCameraId);
+        });
+      }
+    }
+
+    function onCameraChange() {
+      const selectedId = document.getElementById('camera-select').value;
+      if (!selectedId || selectedId === AppState.currentCameraId) return;
+      AppState.currentCameraId = selectedId;
+      if (AppState.isScanningActive) {
+        AppState.html5QrCode.stop().then(() => {
+          launchCamera(AppState.currentCameraId);
+        });
+      }
+    }
+
+    // Called when a QR code is detected in camera
+    function onQrCodeScanned(decodedText) {
+      if (AppState.isProcessingScan) return;
+      processCheckIn(decodedText.trim());
+    }
+
+    // Manual ID fallback submission
+    function submitManualCheckIn() {
+      const input = document.getElementById('manual-code-input');
+      const val = input.value.trim().toUpperCase();
+      if (!val) return;
+      processCheckIn(val);
+      input.value = '';
+    }
+
+    // Core Check-In Processor
+    function processCheckIn(rawId) {
+      if (AppState.isProcessingScan) return;
+      AppState.isProcessingScan = true;
+
+      // Sanitize ID (e.g. if user encoded a URL or prefix)
+      const cleanId = rawId.includes('/') ? rawId.split('/').pop().trim().toUpperCase() : rawId.trim().toUpperCase();
+
+      if (AppState.isDemoMode) {
+        processDemoCheckIn(cleanId);
+        return;
+      }
+
+      // Live Google Apps Script POST
+      fetch(AppState.scriptUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({
+          action: 'checkin',
+          id: cleanId,
+          scannedBy: AppState.gateOperator,
+          passcode: AppState.passcode
+        })
+      })
+      .then(res => res.json())
+      .then(data => {
+        handleCheckInResponse(data, cleanId);
+      })
+      .catch(err => {
+        showScanFeedback('error', '⚠️', 'Network Connection Error', 'Could not reach Google Sheets. Check your internet connection.');
+        playSound('error');
+        triggerHaptic([200]);
+        setTimeout(() => { AppState.isProcessingScan = false; }, 2500);
+      });
+    }
+
+    function processDemoCheckIn(id) {
+      setTimeout(() => {
+        const att = AppState.attendees.find(a => a.id === id);
+        const now = new Date();
+        const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+        if (!att) {
+          handleCheckInResponse({ status: 'not_found', id: id }, id);
+          return;
+        }
+
+        if (att.checkedIn) {
+          handleCheckInResponse({
+            status: 'duplicate',
+            id: id,
+            name: att.name,
+            team: att.team,
+            timestamp: att.timestamp || 'earlier today',
+            scannedBy: att.scannedBy || 'Gate'
+          }, id);
+          return;
+        }
+
+        att.checkedIn = true;
+        att.timestamp = timeStr;
+        att.scannedBy = AppState.gateOperator;
+        localStorage.setItem('eventCheckin_demoData', JSON.stringify(AppState.attendees));
+
+        handleCheckInResponse({
+          status: 'success',
+          id: id,
+          name: att.name,
+          team: att.team,
+          timestamp: timeStr,
+          scannedBy: AppState.gateOperator
+        }, id);
+      }, 250);
+    }
+
+    function handleCheckInResponse(data, scannedId) {
+      if (data.status === 'success') {
+        showScanFeedback('success', '✅', `${data.name || 'Attendee'} Checked In`, `${data.team ? 'Team: ' + data.team + ' • ' : ''}ID: ${data.id} • ${data.timestamp}`);
+        playSound('success');
+        triggerHaptic([80, 50, 80]);
+        addSessionLog('success', data.name, data.team, data.id, data.timestamp);
+        renderDashboard();
+      } else if (data.status === 'duplicate') {
+        showScanFeedback('duplicate', '⏱️', `Already Checked In: ${data.name || scannedId}`, `First checked in at ${data.timestamp || 'earlier'} by ${data.scannedBy || 'Gate'}`);
+        playSound('warning');
+        triggerHaptic([150, 100, 150]);
+        addSessionLog('duplicate', data.name || scannedId, data.team, scannedId, data.timestamp);
+      } else if (data.status === 'not_found') {
+        showScanFeedback('error', '❌', 'Code Not Recognized', `ID "${scannedId}" was not found in the attendee list.`);
+        playSound('error');
+        triggerHaptic([250]);
+        addSessionLog('not_found', 'Unrecognized', '', scannedId, 'Invalid');
+      } else {
+        showScanFeedback('error', '⚠️', 'Check-In Error', data.message || 'An unexpected error occurred.');
+        playSound('error');
+        triggerHaptic([250]);
+      }
+
+      setTimeout(() => {
+        AppState.isProcessingScan = false;
+      }, 2000);
+    }
+
+    function showScanFeedback(type, icon, title, detail) {
+      const banner = document.getElementById('scan-feedback-banner');
+      banner.className = `scan-feedback-banner ${type}`;
+      banner.style.display = 'block';
+
+      document.getElementById('feedback-icon').textContent = icon;
+      document.getElementById('feedback-title').textContent = title;
+      document.getElementById('feedback-detail').textContent = detail;
+    }
+
+    function addSessionLog(status, name, team, id, time) {
+      const list = document.getElementById('session-log-list');
+
+      // Clear empty state message if present
+      if (AppState.sessionScans.length === 0) {
+        list.innerHTML = '';
+      }
+
+      AppState.sessionScans.unshift({ status, name, team, id, time });
+      document.getElementById('session-scan-count').textContent = AppState.sessionScans.filter(s => s.status === 'success').length;
+
+      const item = document.createElement('div');
+      item.className = 'session-log-item';
+
+      let icon = '✅';
+      let statusColor = '#34d399';
+      if (status === 'duplicate') { icon = '⏱️'; statusColor = '#fbbf24'; }
+      if (status === 'not_found') { icon = '❌'; statusColor = '#fca5a5'; }
+
+      item.innerHTML = `
+        <div style="display:flex; align-items:center; gap:10px;">
+          <span style="font-size:1.1rem;">${icon}</span>
+          <div>
+            <div style="font-weight:600; color:#fff;">${escapeHtml(name)}</div>
+            <div style="font-size:0.75rem; color:var(--text-dim);">${escapeHtml(team ? team + ' • ' : '')}${escapeHtml(id)}</div>
+          </div>
+        </div>
+        <div class="font-mono" style="font-size:0.75rem; color:${statusColor};">
+          ${escapeHtml(time)}
+        </div>
+      `;
+
+      list.prepend(item);
+    }
+
+    function clearSessionHistory() {
+      AppState.sessionScans = [];
+      document.getElementById('session-scan-count').textContent = '0';
+      document.getElementById('session-log-list').innerHTML = `
+        <div style="text-align:center; color:var(--text-dim); padding: 40px 10px;">
+          Feed cleared. Ready for next scan.
+        </div>
+      `;
+    }
+
+    function saveGateOperator() {
+      const val = document.getElementById('gate-operator-name').value.trim();
+      AppState.gateOperator = val || 'Gate Scanner';
+      localStorage.setItem('eventCheckin_gateName', AppState.gateOperator);
+    }
+
+    // -----------------------------------------------------------------
+    // QR BADGE STUDIO & GENERATOR
+    // -----------------------------------------------------------------
+    let generatedRecords = [];
+
+    function onGeneratorModeChange() {
+      const mode = document.getElementById('generator-mode-select').value;
+      const input = document.getElementById('generator-csv-input');
+      if (mode === 'team') {
+        input.placeholder = "TeamName\nFalcons\nRavens\nEagles";
+      } else {
+        input.placeholder = "Name,Team\nAlex Chen,Falcons\nPriya Nair,Falcons\nSam Diaz,Ravens";
+      }
+    }
+
+    function loadSampleCSV() {
+      document.getElementById('generator-csv-input').value =
+`Name,Team
+Alex Chen,Falcons
+Priya Nair,Falcons
+Sam Diaz,Ravens
+Jo Lin,Ravens
+Maria Gomez,Engineering
+Jordan Miller,Design`;
+    }
+
+    function makeUniqueId(prefix) {
+      const chars = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+      let s = '';
+      for (let i = 0; i < 6; i++) {
+        s += chars[Math.floor(Math.random() * chars.length)];
+      }
+      return `${prefix}-${s}`;
+    }
+
+    function generateBadgesFromInput() {
+      const raw = document.getElementById('generator-csv-input').value.trim();
+      const mode = document.getElementById('generator-mode-select').value;
+      if (!raw) {
+        alert('Please enter or load some attendee names.');
+        return;
+      }
+
+      const lines = raw.split('\n').map(l => l.trim()).filter(Boolean);
+      let dataLines = lines;
+      if (/^name/i.test(lines[0]) || /^team/i.test(lines[0])) {
+        dataLines = lines.slice(1);
+      }
+
+      generatedRecords = [];
+      const seenIds = new Set();
+
+      dataLines.forEach(line => {
+        const parts = line.split(',').map(p => p.trim());
+        let id;
+        do {
+          id = makeUniqueId(mode === 'team' ? 'TEAM' : 'ATT');
+        } while (seenIds.has(id));
+        seenIds.add(id);
+
+        if (mode === 'team') {
+          generatedRecords.push({ id, name: parts[0], team: parts[0] });
+        } else {
+          generatedRecords.push({ id, name: parts[0] || '(Unnamed)', team: parts[1] || 'General' });
+        }
+      });
+
+      renderGeneratedBadges();
+    }
+
+    function renderGeneratedBadges() {
+      const container = document.getElementById('badges-container');
+      container.innerHTML = '';
+      document.getElementById('badge-count-label').textContent = generatedRecords.length;
+
+      const eventTitle = document.getElementById('badge-event-name').value.trim() || AppState.eventName;
+      const theme = document.getElementById('badge-theme-select').value;
+
+      generatedRecords.forEach(rec => {
+        const badge = document.createElement('div');
+        badge.className = `badge-card ${theme}`;
+
+        const hole = document.createElement('div');
+        hole.className = 'badge-lanyard-hole';
+        badge.appendChild(hole);
+
+        const ev = document.createElement('div');
+        ev.className = 'badge-event-title';
+        ev.textContent = eventTitle;
+        badge.appendChild(ev);
+
+        const qrWrap = document.createElement('div');
+        qrWrap.className = 'badge-qr-wrap';
+        badge.appendChild(qrWrap);
+
+        const nameEl = document.createElement('div');
+        nameEl.className = 'badge-attendee-name';
+        nameEl.textContent = rec.name;
+        badge.appendChild(nameEl);
+
+        if (rec.team) {
+          const teamEl = document.createElement('div');
+          teamEl.className = 'badge-attendee-team';
+          teamEl.textContent = rec.team;
+          badge.appendChild(teamEl);
+        }
+
+        const idEl = document.createElement('div');
+        idEl.className = 'badge-attendee-id';
+        idEl.textContent = rec.id;
+        badge.appendChild(idEl);
+
+        // Actions
+        const actions = document.createElement('div');
+        actions.className = 'badge-actions';
+        actions.innerHTML = `
+          <button class="btn btn-sm btn-secondary" style="flex:1;" onclick="downloadSingleBadgePNG('${rec.id}', '${escapeHtml(rec.name)}')">Download PNG</button>
+        `;
+        badge.appendChild(actions);
+
+        container.appendChild(badge);
+
+        // Render QR Code
+        new QRCode(qrWrap, {
+          text: rec.id,
+          width: 130,
+          height: 130,
+          colorDark: '#0f172a',
+          colorLight: '#ffffff',
+          correctLevel: QRCode.CorrectLevel.M
+        });
+      });
+    }
+
+    function updateAllBadges() {
+      const title = document.getElementById('badge-event-name').value.trim();
+      AppState.eventName = title || 'TechSummit 2026';
+      localStorage.setItem('eventCheckin_eventName', AppState.eventName);
+      document.querySelectorAll('.badge-event-title').forEach(el => el.textContent = AppState.eventName);
+    }
+
+    function updateBadgeTheme() {
+      const theme = document.getElementById('badge-theme-select').value;
+      document.querySelectorAll('.badge-card').forEach(card => {
+        card.className = `badge-card ${theme}`;
+      });
+    }
+
+    // Push Generated Attendees to Google Sheet via backend API
+    function pushGeneratedToSheet() {
+      if (generatedRecords.length === 0) {
+        alert('Please generate some badges first.');
+        return;
+      }
+
+      if (AppState.isDemoMode) {
+        let added = 0;
+        generatedRecords.forEach(r => {
+          if (!AppState.attendees.some(a => a.id === r.id)) {
+            AppState.attendees.push({
+              id: r.id,
+              name: r.name,
+              team: r.team,
+              checkedIn: false,
+              timestamp: '',
+              scannedBy: ''
+            });
+            added++;
+          }
+        });
+        localStorage.setItem('eventCheckin_demoData', JSON.stringify(AppState.attendees));
+        renderDashboard();
+        alert(`Demo Mode: Added ${added} attendees directly to your directory!`);
+        return;
+      }
+
+      if (!AppState.scriptUrl) {
+        alert('Please configure your Google Apps Script URL in Settings first.');
+        switchTab('settings');
+        return;
+      }
+
+      const pushBtn = document.getElementById('btn-push-to-sheet');
+      pushBtn.disabled = true;
+      pushBtn.textContent = 'Pushing to Sheet...';
+
+      fetch(AppState.scriptUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({
+          action: 'batchAdd',
+          attendees: generatedRecords,
+          passcode: AppState.passcode
+        })
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.status === 'success') {
+          alert(`Success! Added ${data.added} new attendees to your Google Sheet (${data.skipped} skipped).`);
+          fetchData();
+        } else {
+          alert('Error updating Google Sheet: ' + (data.message || 'Unknown error'));
+        }
+      })
+      .catch(err => {
+        alert('Failed to connect to Google Apps Script: ' + err.message);
+      })
+      .finally(() => {
+        pushBtn.disabled = false;
+        pushBtn.innerHTML = '<span>☁️</span> Push Attendees to Google Sheet';
+      });
+    }
+
+    function downloadBadgesCSV() {
+      if (generatedRecords.length === 0) {
+        alert('Please generate badges first.');
+        return;
+      }
+      const header = 'ID,Name,Team,CheckedIn,Timestamp,ScannedBy';
+      const rows = generatedRecords.map(r =>
+        `${r.id},"${r.name.replace(/"/g, '""')}","${r.team.replace(/"/g, '""')}",FALSE,,`
+      );
+      const csv = [header, ...rows].join('\n');
+      downloadBlob(csv, 'text/csv', 'event_attendees.csv');
+    }
+
+    function downloadSingleBadgePNG(id, name) {
+      // Find card element
+      const cards = Array.from(document.querySelectorAll('.badge-card'));
+      const target = cards.find(c => c.querySelector('.badge-attendee-id')?.textContent === id);
+      if (!target) return;
+
+      const img = target.querySelector('img');
+      if (img && img.src) {
+        const a = document.createElement('a');
+        a.href = img.src;
+        a.download = `QR_${name.replace(/\s+/g, '_')}_${id}.png`;
+        a.click();
+      }
+    }
+
+    // -----------------------------------------------------------------
+    // CSV EXPORT FOR DASHBOARD
+    // -----------------------------------------------------------------
+    function exportCSV() {
+      if (AppState.attendees.length === 0) {
+        alert('No attendees to export.');
+        return;
+      }
+      const header = 'ID,Name,Team,CheckedIn,Timestamp,ScannedBy';
+      const rows = AppState.attendees.map(a =>
+        `${a.id},"${(a.name||'').replace(/"/g, '""')}","${(a.team||'').replace(/"/g, '""')}",${a.checkedIn ? 'TRUE' : 'FALSE'},"${a.timestamp||''}","${(a.scannedBy||'').replace(/"/g, '""')}"`
+      );
+      const csv = [header, ...rows].join('\n');
+      downloadBlob(csv, 'text/csv', `event_checkin_export_${new Date().toISOString().slice(0,10)}.csv`);
+    }
+
+    function downloadBlob(content, mimeType, filename) {
+      const blob = new Blob([content], { type: mimeType });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    // -----------------------------------------------------------------
+    // MODALS (ADD ATTENDEE & QR PREVIEW)
+    // -----------------------------------------------------------------
+    function openAddAttendeeModal() {
+      document.getElementById('new-att-name').value = '';
+      document.getElementById('new-att-team').value = '';
+      document.getElementById('new-att-id').value = '';
+      document.getElementById('add-attendee-modal').classList.add('active');
+    }
+
+    function closeAddAttendeeModal() {
+      document.getElementById('add-attendee-modal').classList.remove('active');
+    }
+
+    function submitNewAttendee() {
+      const name = document.getElementById('new-att-name').value.trim();
+      const team = document.getElementById('new-att-team').value.trim() || 'General';
+      let id = document.getElementById('new-att-id').value.trim().toUpperCase();
+
+      if (!name) return;
+      if (!id) id = makeUniqueId('ATT');
+
+      closeAddAttendeeModal();
+
+      if (AppState.isDemoMode) {
+        AppState.attendees.push({
+          id: id,
+          name: name,
+          team: team,
+          checkedIn: false,
+          timestamp: '',
+          scannedBy: ''
+        });
+        localStorage.setItem('eventCheckin_demoData', JSON.stringify(AppState.attendees));
+        renderDashboard();
+        return;
+      }
+
+      // Live Google Apps Script POST
+      fetch(AppState.scriptUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({
+          action: 'add',
+          id: id,
+          name: name,
+          team: team,
+          passcode: AppState.passcode
+        })
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.status === 'success') {
+          fetchData();
+        } else {
+          alert('Error adding attendee: ' + data.message);
+        }
+      })
+      .catch(err => {
+        alert('Network error: ' + err.message);
+      });
+    }
+
+    function openBadgeModal(id) {
+      const att = AppState.attendees.find(a => a.id === id);
+      if (!att) return;
+
+      const modal = document.getElementById('badge-modal');
+      const content = document.getElementById('modal-badge-content');
+      document.getElementById('modal-badge-title').textContent = `${att.name} — Pass`;
+
+      content.innerHTML = `
+        <div class="badge-card theme-white" id="single-modal-badge" style="max-width:280px; box-shadow:none; border:1px solid #cbd5e1;">
+          <div class="badge-lanyard-hole"></div>
+          <div class="badge-event-title">${escapeHtml(AppState.eventName)}</div>
+          <div class="badge-qr-wrap" id="modal-qr-container"></div>
+          <div class="badge-attendee-name">${escapeHtml(att.name)}</div>
+          ${att.team ? `<div class="badge-attendee-team">${escapeHtml(att.team)}</div>` : ''}
+          <div class="badge-attendee-id">${escapeHtml(att.id)}</div>
+        </div>
+      `;
+
+      new QRCode(document.getElementById('modal-qr-container'), {
+        text: att.id,
+        width: 140,
+        height: 140,
+        colorDark: '#0f172a',
+        colorLight: '#ffffff',
+        correctLevel: QRCode.CorrectLevel.M
+      });
+
+      modal.classList.add('active');
+    }
+
+    function closeBadgeModal() {
+      document.getElementById('badge-modal').classList.remove('active');
+    }
+
+    function printSingleModalBadge() {
+      window.print();
+    }
+
+    // -----------------------------------------------------------------
+    // SETTINGS & DEMO MODE
+    // -----------------------------------------------------------------
+    function initSettingsUI() {
+      document.getElementById('settings-script-url').value = AppState.scriptUrl;
+      document.getElementById('settings-passcode').value = AppState.passcode;
+      document.getElementById('settings-auto-refresh').value = AppState.autoRefreshInterval.toString();
+      document.getElementById('gate-operator-name').value = AppState.gateOperator;
+      document.getElementById('badge-event-name').value = AppState.eventName;
+
+      document.getElementById('setting-sound-fx').checked = AppState.soundEnabled;
+      document.getElementById('setting-haptic-fx').checked = AppState.vibrateEnabled;
+
+      updateDemoModeButton();
+    }
+
+    function saveSettingsAndTest() {
+      const url = document.getElementById('settings-script-url').value.trim();
+      const code = document.getElementById('settings-passcode').value.trim();
+
+      AppState.scriptUrl = url;
+      AppState.passcode = code;
+
+      localStorage.setItem('eventCheckin_scriptUrl', url);
+      localStorage.setItem('eventCheckin_passcode', code);
+
+      if (url) {
+        AppState.isDemoMode = false;
+        localStorage.setItem('eventCheckin_demoMode', 'false');
+      }
+
+      updateStatusBadge();
+      updateDemoModeButton();
+
+      const resultBox = document.getElementById('connection-test-result');
+      resultBox.innerHTML = '<span style="color:var(--accent);">Testing connection to Google Apps Script...</span>';
+
+      if (!url) {
+        resultBox.innerHTML = '<span style="color:var(--warning);">No URL entered. Running in Demo Mode.</span>';
+        return;
+      }
+
+      const t0 = performance.now();
+      fetch(`${url}?action=ping${code ? '&passcode=' + encodeURIComponent(code) : ''}`)
+        .then(res => res.json())
+        .then(data => {
+          const latency = Math.round(performance.now() - t0);
+          if (data.status === 'success') {
+            resultBox.innerHTML = `<span style="color:var(--primary);">✅ Connected successfully! (${latency}ms latency)</span>`;
+            updateStatusBadge('connected');
+            fetchData();
+          } else {
+            resultBox.innerHTML = `<span style="color:var(--danger);">❌ Server returned: ${escapeHtml(data.message || 'Error')}</span>`;
+            updateStatusBadge('error');
+          }
+        })
+        .catch(err => {
+          resultBox.innerHTML = `<span style="color:var(--danger);">❌ Connection failed: ${escapeHtml(err.message)}</span>`;
+          updateStatusBadge('error');
+        });
+    }
+
+    function toggleDemoMode() {
+      AppState.isDemoMode = !AppState.isDemoMode;
+      localStorage.setItem('eventCheckin_demoMode', AppState.isDemoMode.toString());
+      updateStatusBadge();
+      updateDemoModeButton();
+
+      if (AppState.isDemoMode) {
+        AppState.attendees = JSON.parse(localStorage.getItem('eventCheckin_demoData') || JSON.stringify(DEMO_ATTENDEES));
+        renderDashboard();
+      } else {
+        fetchData();
+      }
+    }
+
+    function updateDemoModeButton() {
+      const btnText = document.getElementById('demo-mode-btn-text');
+      if (btnText) {
+        btnText.textContent = AppState.isDemoMode ? 'Switch to Live Mode' : 'Switch to Demo Mode';
+      }
+    }
+
+    function updateStatusBadge(forcedState) {
+      const dot = document.getElementById('conn-status-dot');
+      const text = document.getElementById('conn-status-text');
+      const badge = document.getElementById('env-badge');
+
+      dot.className = 'status-dot';
+
+      if (AppState.isDemoMode) {
+        dot.classList.add('demo');
+        text.textContent = 'Demo Mode';
+        badge.textContent = 'DEMO MODE';
+        badge.style.background = 'rgba(6, 182, 212, 0.15)';
+        badge.style.color = 'var(--accent)';
+      } else if (forcedState === 'connected') {
+        dot.classList.add('connected');
+        text.textContent = 'Live Connected';
+        badge.textContent = 'LIVE SHEETS';
+        badge.style.background = 'rgba(16, 185, 129, 0.15)';
+        badge.style.color = 'var(--primary)';
+      } else if (forcedState === 'error') {
+        dot.classList.add('error');
+        text.textContent = 'Sync Error';
+        badge.textContent = 'OFFLINE';
+        badge.style.background = 'rgba(239, 68, 68, 0.15)';
+        badge.style.color = 'var(--danger)';
+      } else {
+        dot.classList.add('warning');
+        text.textContent = AppState.scriptUrl ? 'Live (Unverified)' : 'No API URL';
+        badge.textContent = 'CONFIG NEEDED';
+      }
+    }
+
+    function updateAutoRefreshSetting() {
+      const val = parseInt(document.getElementById('settings-auto-refresh').value, 10);
+      AppState.autoRefreshInterval = val;
+      localStorage.setItem('eventCheckin_autoRefresh', val.toString());
+      setupAutoRefresh();
+    }
+
+    function savePreferences() {
+      AppState.soundEnabled = document.getElementById('setting-sound-fx').checked;
+      AppState.vibrateEnabled = document.getElementById('setting-haptic-fx').checked;
+      localStorage.setItem('eventCheckin_soundEnabled', AppState.soundEnabled.toString());
+      localStorage.setItem('eventCheckin_vibrateEnabled', AppState.vibrateEnabled.toString());
+    }
+
+    function copyBackendCode() {
+      const preview = document.getElementById('code-snippet-preview').textContent;
+      navigator.clipboard.writeText(preview).then(() => {
+        alert('CheckInBackend.gs script reference copied to clipboard! (Full script is in CheckInBackend.gs)');
+      });
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+  </script>
+</body>
+</html>
